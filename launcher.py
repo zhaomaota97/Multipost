@@ -6,11 +6,6 @@
 import os
 import sys
 
-# 打包态：让 Playwright 在程序内部（随附）查找 Chromium，无需用户另装浏览器。
-# 必须在导入 playwright/app 之前设置。
-if getattr(sys, "frozen", False):
-    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "0")
-
 for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding="utf-8", errors="replace")
@@ -33,9 +28,35 @@ def _open_browser(url: str):
         pass
 
 
+def _ensure_browser():
+    """确保 Chromium 内核已安装；首次运行时自动下载（约 150MB，仅一次）。"""
+    from pathlib import Path
+
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            if Path(p.chromium.executable_path).exists():
+                return  # 已安装
+    except Exception:  # noqa: BLE001
+        pass
+
+    print("首次运行：正在下载浏览器内核（约 150MB，仅需一次，请耐心等待）……")
+    try:
+        import subprocess
+        from playwright._impl._driver import compute_driver_executable, get_driver_env
+
+        node, cli = compute_driver_executable()
+        subprocess.run([node, cli, "install", "chromium"], env=get_driver_env(), check=False)
+        print("浏览器内核准备完成。")
+    except Exception as e:  # noqa: BLE001
+        print(f"浏览器内核下载失败：{e}\n请确保电脑能联网后重新打开本程序。")
+
+
 def main():
     import uvicorn
 
+    _ensure_browser()
     s = config.SETTINGS["server"]
     url = f"http://{s['host']}:{s['port']}"
     threading.Thread(target=_open_browser, args=(url,), daemon=True).start()

@@ -31,14 +31,10 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller==6.11.1
 
-      - name: 安装 Chromium 到包内（供打包收集）
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: "0"
-        run: python -m playwright install chromium
+      # 不在此处安装/打包 Chromium：浏览器在程序首次运行时自动下载，
+      # 避免 PyInstaller 在 macOS 上对 Chromium.app 重新签名失败。
 
       - name: PyInstaller 打包
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: "0"
         run: pyinstaller fabu.spec --noconfirm
 
       - name: 打包成 zip
