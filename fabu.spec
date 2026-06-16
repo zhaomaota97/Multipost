@@ -6,7 +6,10 @@
 - 构建前需用 PLAYWRIGHT_BROWSERS_PATH=0 安装 chromium，使其落在包内被一起收集；
 - 静态网页与默认配置一并打包。
 """
+import os
+import playwright as _pw
 from PyInstaller.utils.hooks import collect_all
+from PyInstaller.building.datastruct import Tree
 
 datas = [("app/static", "app/static"), ("config/settings.json", "config")]
 binaries = []
@@ -22,6 +25,19 @@ for _pkg in ("playwright",):
     datas += _d
     binaries += _b
     hiddenimports += _h
+
+# 关键：把随附的 Chromium 浏览器从 binaries 中剔除，改为「数据原样拷贝」。
+# 否则 PyInstaller 会尝试对 Chromium.app 内的可执行文件逐个 codesign，在 macOS 上会失败。
+_BROWSERS_MARK = os.path.join("driver", "package", ".local-browsers")
+binaries = [e for e in binaries if _BROWSERS_MARK not in (e[0] or "") and _BROWSERS_MARK not in (e[1] or "")]
+datas = [e for e in datas if _BROWSERS_MARK not in (e[0] or "") and _BROWSERS_MARK not in (e[1] or "")]
+
+_browsers_src = os.path.join(os.path.dirname(_pw.__file__), "driver", "package", ".local-browsers")
+if os.path.isdir(_browsers_src):
+    datas += Tree(
+        _browsers_src,
+        prefix=os.path.join("playwright", "driver", "package", ".local-browsers"),
+    )
 
 a = Analysis(
     ["launcher.py"],
