@@ -1,0 +1,12 @@
+venv/
+.testvenv/
+build/
+dist/
+__pycache__/
+*.pyc
+data/cookies/*.json
+data/tasks.json
+logs/*.log
+logs/*.png
+videos/*
+!videos/.gitkeep

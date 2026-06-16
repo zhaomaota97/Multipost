@@ -1,0 +1,54 @@
+name: build-mac
+
+# 在 GitHub 免费 macOS 云端构建 .app。
+# 触发：手动运行（Actions 页面点 Run workflow），或推送 v* 标签。
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13   # Intel (x86_64)
+            arch: intel
+          - os: macos-14   # Apple Silicon (arm64)
+            arch: apple-silicon
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller==6.11.1
+
+      - name: 安装 Chromium 到包内（供打包收集）
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: "0"
+        run: python -m playwright install chromium
+
+      - name: PyInstaller 打包
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: "0"
+        run: pyinstaller fabu.spec --noconfirm
+
+      - name: 打包成 zip
+        run: |
+          cd dist
+          zip -ry "视频一键发布-${{ matrix.arch }}.zip" "视频一键发布.app"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: 视频一键发布-${{ matrix.arch }}
+          path: dist/*.zip
+          if-no-files-found: error

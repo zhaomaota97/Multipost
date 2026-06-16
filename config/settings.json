@@ -1,0 +1,20 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8800
+  },
+  "browser": {
+    "headless": false,
+    "channel": "chrome",
+    "slow_mo_ms": 0,
+    "login_timeout_sec": 180,
+    "action_timeout_sec": 60,
+    "upload_timeout_sec": 1800,
+    "keep_open_seconds": 600
+  },
+  "paths": {
+    "cookies_dir": "data/cookies",
+    "logs_dir": "logs",
+    "videos_dir": "videos"
+  }
+}
