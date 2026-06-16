@@ -7,9 +7,7 @@
 - 静态网页与默认配置一并打包。
 """
 import os
-import playwright as _pw
 from PyInstaller.utils.hooks import collect_all
-from PyInstaller.building.datastruct import Tree
 
 datas = [("app/static", "app/static"), ("config/settings.json", "config")]
 binaries = []
@@ -26,18 +24,13 @@ for _pkg in ("playwright",):
     binaries += _b
     hiddenimports += _h
 
-# 关键：把随附的 Chromium 浏览器从 binaries 中剔除，改为「数据原样拷贝」。
-# 否则 PyInstaller 会尝试对 Chromium.app 内的可执行文件逐个 codesign，在 macOS 上会失败。
+# 关键：把随附 Chromium（.local-browsers 下的条目）从 binaries 移到 datas。
+# collect_all 已按正确的 2 元组收集好结构，这里只改分类——让它们被原样拷贝、
+# 不进入 PyInstaller 的二进制 codesign 流程（在 macOS 上对 Chromium.app 签名会失败）。
 _BROWSERS_MARK = os.path.join("driver", "package", ".local-browsers")
-binaries = [e for e in binaries if _BROWSERS_MARK not in (e[0] or "") and _BROWSERS_MARK not in (e[1] or "")]
-datas = [e for e in datas if _BROWSERS_MARK not in (e[0] or "") and _BROWSERS_MARK not in (e[1] or "")]
-
-_browsers_src = os.path.join(os.path.dirname(_pw.__file__), "driver", "package", ".local-browsers")
-if os.path.isdir(_browsers_src):
-    datas += Tree(
-        _browsers_src,
-        prefix=os.path.join("playwright", "driver", "package", ".local-browsers"),
-    )
+_moved = [e for e in binaries if _BROWSERS_MARK in (e[0] or "") or _BROWSERS_MARK in (e[1] or "")]
+binaries = [e for e in binaries if e not in _moved]
+datas += _moved
 
 a = Analysis(
     ["launcher.py"],
