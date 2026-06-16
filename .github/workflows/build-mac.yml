@@ -8,43 +8,55 @@ on:
     tags: ["v*"]
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-13   # Intel (x86_64)
-            arch: intel
-          - os: macos-14   # Apple Silicon (arm64)
-            arch: apple-silicon
-    runs-on: ${{ matrix.os }}
+  # Apple Silicon（arm64）：在 macos-14 上原生构建
+  build-apple-silicon:
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: 安装依赖
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller==6.11.1
-
-      # 不在此处安装/打包 Chromium：浏览器在程序首次运行时自动下载，
-      # 避免 PyInstaller 在 macOS 上对 Chromium.app 重新签名失败。
-
       - name: PyInstaller 打包
         run: pyinstaller fabu.spec --noconfirm
-
       - name: 打包成 zip
-        run: |
-          cd dist
-          zip -ry "视频一键发布-${{ matrix.arch }}.zip" "视频一键发布.app"
-
-      - name: 上传产物
-        uses: actions/upload-artifact@v4
+        run: cd dist && zip -ry "视频一键发布-apple-silicon.zip" "视频一键发布.app"
+      - uses: actions/upload-artifact@v4
         with:
-          name: 视频一键发布-${{ matrix.arch }}
+          name: 视频一键发布-apple-silicon
+          path: dist/*.zip
+          if-no-files-found: error
+
+  # Intel（x86_64）：在 macos-14 上借 Rosetta + 通用版 Python 交叉构建，
+  # 避免依赖稀缺的 macos-13 Intel runner。
+  build-intel:
+    runs-on: macos-14
+    env:
+      PYBIN: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 Rosetta
+        run: sudo softwareupdate --install-rosetta --agree-to-license
+      - name: 安装通用版(universal2) Python 3.12
+        run: |
+          curl -fsSL -o python.pkg https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg
+          sudo installer -pkg python.pkg -target /
+          arch -x86_64 "$PYBIN" --version
+      - name: 安装依赖（x86_64）
+        run: |
+          arch -x86_64 "$PYBIN" -m pip install --upgrade pip
+          arch -x86_64 "$PYBIN" -m pip install -r requirements.txt
+          arch -x86_64 "$PYBIN" -m pip install pyinstaller==6.11.1
+      - name: PyInstaller 打包（x86_64）
+        run: arch -x86_64 "$PYBIN" -m PyInstaller fabu.spec --noconfirm
+      - name: 打包成 zip
+        run: cd dist && zip -ry "视频一键发布-intel.zip" "视频一键发布.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 视频一键发布-intel
           path: dist/*.zip
           if-no-files-found: error
